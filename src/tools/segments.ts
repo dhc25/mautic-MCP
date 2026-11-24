@@ -1,3 +1,5 @@
+import { normalizeSegmentFilters, pageLimit, compactContacts, writeSummary } from './safety.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -26,7 +28,7 @@ export const toolDefinitions: ToolDefinition[] = [
         description: { type: 'string', description: 'Segment description' },
         isPublished: { type: 'boolean', description: 'Publish immediately' },
         isGlobal: { type: 'boolean', description: 'Global segment' },
-        filters: { type: 'array', description: 'Segment filters' },
+        filters: { type: 'array', description: 'Native Mautic filters: field, operator, glue, properties.filter; known email and membership metadata is normalized. Other fields require native object/type.', items: { type: 'object' } },
       },
       required: ['name'],
     },
@@ -38,7 +40,7 @@ export const toolDefinitions: ToolDefinition[] = [
       type: 'object',
       properties: {
         segmentId: { type: 'number', description: 'Segment ID' },
-        limit: { type: 'number', description: 'Number of results', maximum: 200 },
+        limit: { type: 'number', description: 'Number of contacts (max 5)', maximum: 5 },
         start: { type: 'number', description: 'Starting offset' },
       },
       required: ['segmentId'],
@@ -61,21 +63,25 @@ export const toolHandlers: Record<string, ToolHandler> = {
   },
 
   async create_segment(client: MauticApiClient, args: any) {
-    const response = await client.v1.post('/segments/new', args);
+    const payload = { ...args };
+    if (args.filters !== undefined) payload.filters = normalizeSegmentFilters(args.filters);
+    const response = await client.v1.post('/segments/new', payload);
     return {
-      content: [{ type: 'text', text: `Segment created successfully:\n${JSON.stringify(response.data.list, null, 2)}` }],
+      content: [{ type: 'text', text: `Segment created successfully:\n${JSON.stringify(writeSummary(response.data.list, Object.keys(payload)))}` }],
     };
   },
 
   async get_segment_contacts(client: MauticApiClient, args: any) {
     const { segmentId, limit, start } = args;
-    const params: any = {};
-    if (limit) params.limit = Math.min(limit, 200);
-    if (start) params.start = start;
-
-    const response = await client.v1.get(`/segments/${segmentId}/contacts`, { params });
+    if (!Number.isSafeInteger(segmentId) || segmentId < 1) throw new McpError(ErrorCode.InvalidParams, 'Invalid segment ID');
+    const segment = (await client.v1.get(`/segments/${segmentId}`)).data.list;
+    if (typeof segment?.alias !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(segment.alias)) {
+      throw new McpError(ErrorCode.InvalidParams, 'Segment alias missing or unsupported for contact search');
+    }
+    const params = { search: `segment:${segment.alias}`, limit: pageLimit(limit), start: start ?? 0, minimal: true };
+    const response = await client.v1.get('/contacts', { params });
     return {
-      content: [{ type: 'text', text: `Found ${response.data.total} contacts in segment:\n${JSON.stringify(response.data.contacts, null, 2)}` }],
+      content: [{ type: 'text', text: `Found ${response.data.total} contacts in segment:\n${JSON.stringify(compactContacts(response.data.contacts))}` }],
     };
   },
 };

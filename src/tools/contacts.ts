@@ -1,4 +1,5 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { pageLimit, compactContacts, contactSummary, writeSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -40,12 +41,13 @@ export const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'get_contact',
-    description: 'Get contact details by ID or email',
+    description: 'Get essential contact details by ID or email; request fields explicitly for more information',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'number', description: 'Contact ID' },
         email: { type: 'string', description: 'Contact email address' },
+        fields: { type: 'array', items: { type: 'string' }, description: 'Additional field aliases to return (max 20)' },
       },
     },
   },
@@ -56,12 +58,12 @@ export const toolDefinitions: ToolDefinition[] = [
       type: 'object',
       properties: {
         search: { type: 'string', description: 'Search term' },
-        limit: { type: 'number', description: 'Number of results (max 200)', maximum: 200 },
+        limit: { type: 'number', description: 'Number of results (max 5)', maximum: 5 },
         start: { type: 'number', description: 'Starting offset for pagination' },
         orderBy: { type: 'string', description: 'Field to order by' },
         orderByDir: { type: 'string', enum: ['ASC', 'DESC'], description: 'Order direction' },
         publishedOnly: { type: 'boolean', description: 'Only published contacts' },
-        minimal: { type: 'boolean', description: 'Return minimal contact data' },
+        minimal: { type: 'boolean', description: 'Minimal contact data is always returned in searches' },
       },
     },
   },
@@ -94,7 +96,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   async create_contact(client: MauticApiClient, args: any) {
     const response = await client.v1.post('/contacts/new', args);
     return {
-      content: [{ type: 'text', text: `Contact created successfully:\n${JSON.stringify(response.data.contact, null, 2)}` }],
+      content: [{ type: 'text', text: `Contact created successfully:\n${JSON.stringify(writeSummary(response.data.contact, Object.keys(args)))}` }],
     };
   },
 
@@ -102,19 +104,19 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { id, ...updateData } = args;
     const response = await client.v1.patch(`/contacts/${id}/edit`, updateData);
     return {
-      content: [{ type: 'text', text: `Contact updated successfully:\n${JSON.stringify(response.data.contact, null, 2)}` }],
+      content: [{ type: 'text', text: `Contact updated successfully:\n${JSON.stringify(writeSummary(response.data.contact, Object.keys(updateData)))}` }],
     };
   },
 
   async get_contact(client: MauticApiClient, args: any) {
-    const { id, email } = args;
+    const { id, email, fields } = args;
     let response;
 
     if (id) {
       response = await client.v1.get(`/contacts/${id}`);
     } else if (email) {
       const searchResponse = await client.v1.get('/contacts', {
-        params: { search: `email:${email}`, limit: 1 }
+        params: { search: `email:${email}`, limit: 1, minimal: true }
       });
       if (searchResponse.data.total === 0) {
         return { content: [{ type: 'text', text: `No contact found with email: ${email}` }] };
@@ -125,24 +127,29 @@ export const toolHandlers: Record<string, ToolHandler> = {
       throw new McpError(ErrorCode.InvalidParams, 'Either id or email must be provided');
     }
 
+    const contact = response.data.contact;
+    const extra = Object.fromEntries((Array.isArray(fields) ? fields.slice(0, 20) : []).filter((f: unknown) => typeof f === 'string').map((f: string) => {
+      const raw = contact?.fields?.all?.[f] ?? contact?.[f];
+      return [f, raw && typeof raw === 'object' && 'value' in raw ? raw.value : raw];
+    }));
     return {
-      content: [{ type: 'text', text: `Contact details:\n${JSON.stringify(response.data.contact, null, 2)}` }],
+      content: [{ type: 'text', text: `Contact details:\n${JSON.stringify({ ...contactSummary(contact), additionalFields: extra })}` }],
     };
   },
 
   async search_contacts(client: MauticApiClient, args: any) {
     const params: any = {};
     if (args?.search) params.search = args.search;
-    if (args?.limit) params.limit = Math.min(args.limit, 200);
+    params.limit = pageLimit(args?.limit);
     if (args?.start) params.start = args.start;
     if (args?.orderBy) params.orderBy = args.orderBy;
     if (args?.orderByDir) params.orderByDir = args.orderByDir;
     if (args?.publishedOnly) params.publishedOnly = args.publishedOnly;
-    if (args?.minimal) params.minimal = args.minimal;
+    params.minimal = true;
 
     const response = await client.v1.get('/contacts', { params });
     return {
-      content: [{ type: 'text', text: `Found ${response.data.total} contacts:\n${JSON.stringify(response.data.contacts, null, 2)}` }],
+      content: [{ type: 'text', text: `Found ${response.data.total} contacts:\n${JSON.stringify(compactContacts(response.data.contacts))}` }],
     };
   },
 
