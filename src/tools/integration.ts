@@ -1,3 +1,4 @@
+import { mutationSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -91,7 +92,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/hooks/new', payload);
     return {
-      content: [{ type: 'text', text: `Webhook created successfully:\n${JSON.stringify(response.data.hook, null, 2)}` }],
+      content: [{ type: 'text', text: `Webhook created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -103,7 +104,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/files/new', payload);
     return {
-      content: [{ type: 'text', text: `File uploaded successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `File uploaded (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -129,7 +130,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/reports/new', payload);
     return {
-      content: [{ type: 'text', text: `Report created successfully:\n${JSON.stringify(response.data.report, null, 2)}` }],
+      content: [{ type: 'text', text: `Report created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 };
