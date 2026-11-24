@@ -1,3 +1,4 @@
+import { mutationSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -106,7 +107,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v2.post('/projects', payload);
     return {
-      content: [{ type: 'text', text: `Project created successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Project created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -114,7 +115,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { id, ...updateData } = args;
     const response = await client.v2.put(`/projects/${id}`, updateData);
     return {
-      content: [{ type: 'text', text: `Project ${id} updated successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Project ${id} updated (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -124,7 +125,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
       headers: { 'Content-Type': 'application/merge-patch+json' },
     });
     return {
-      content: [{ type: 'text', text: `Project ${id} patched successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Project ${id} patched (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
