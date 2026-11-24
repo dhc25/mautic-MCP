@@ -82,3 +82,43 @@ export function emailSummary(email: any) {
 export function writeSummary(record: any, changedFields?: string[]) {
   return { success: true, id: record?.id, ...(changedFields ? { changedFields } : {}) };
 }
+
+/** Compact acknowledgement for mutation endpoints that return differing envelopes.
+ * Never echo record fields, recipient lists, message bodies or arbitrary metadata.
+ * Retain API-reported outcome/counts and identifiers without inventing them.
+ */
+export function mutationSummary(data: any, changedFields?: string[]) {
+  const result: Record<string, unknown> = {};
+  if (changedFields) result.changedFields = changedFields;
+  const scalarKeys = ['id', '@id', 'success', 'status', 'statusCode', 'total',
+    'sent', 'failed', 'queued', 'processed', 'sentCount', 'failedCount', 'successCount',
+    'contactId', 'campaignId', 'emailId', 'companyId', 'segmentId',
+    'fileId', 'filename', 'fileName', 'path', 'url'];
+  const errorMessages = (value: any): string[] => {
+    if (typeof value === 'string') return [value.slice(0, 500)];
+    if (Array.isArray(value)) return value.slice(0, 10).flatMap(errorMessages);
+    if (value && typeof value === 'object') {
+      return typeof value.message === 'string' ? [value.message.slice(0, 500)] : [];
+    }
+    return [];
+  };
+  const errors: string[] = [];
+  const copy = (record: any) => {
+    if (!record || typeof record !== 'object') return;
+    for (const key of scalarKeys) {
+      const value = record[key];
+      if (['string', 'number', 'boolean'].includes(typeof value) && !(key in result))
+        result[key] = typeof value === 'string' ? value.slice(0, 500) : value;
+    }
+    errors.push(...errorMessages(record.errors), ...errorMessages(record.error));
+  };
+  copy(data);
+  for (const key of ['contact', 'company', 'campaign', 'email', 'list', 'note', 'tag',
+    'category', 'asset', 'page', 'sms', 'field', 'hook', 'report', 'project', 'file']) {
+    copy(data?.[key]);
+  }
+  if (errors.length) result.errors = errors.slice(0, 10);
+  // HTTP success is distinct from delivery or business-level success.
+  result.requestCompleted = true;
+  return result;
+}
