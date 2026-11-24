@@ -1,4 +1,4 @@
-import { emailSummary, pageLimit, writeSummary } from './safety.js';
+import { emailSummary, pageLimit, writeSummary, mutationSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -120,7 +120,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post(`/emails/${emailId}/contact/send`, data);
     return {
-      content: [{ type: 'text', text: `Email sent successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Email sent (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -166,7 +166,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { emailId } = args;
     const response = await client.v1.post(`/emails/${emailId}/send`);
     return {
-      content: [{ type: 'text', text: `Email ${emailId} sent to segment successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Email ${emailId} sent to segment (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -174,7 +174,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { trackingHash } = args;
     const response = await client.v1.post(`/emails/reply/${trackingHash}`);
     return {
-      content: [{ type: 'text', text: `Email reply recorded for tracking hash ${trackingHash}:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Email reply recorded for tracking hash ${trackingHash}:\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
