@@ -1,3 +1,4 @@
+import { emailSummary, pageLimit, writeSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -22,7 +23,7 @@ export const toolDefinitions: ToolDefinition[] = [
       type: 'object',
       properties: {
         search: { type: 'string', description: 'Search term' },
-        limit: { type: 'number', description: 'Number of results', maximum: 200 },
+        limit: { type: 'number', description: 'Number of results (max 20)', maximum: 20 },
         start: { type: 'number', description: 'Starting offset' },
         publishedOnly: { type: 'boolean', description: 'Only published emails' },
       },
@@ -30,11 +31,12 @@ export const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'get_email',
-    description: 'Get detailed email information',
+    description: 'Get email metadata; optionally include content',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'number', description: 'Email ID' },
+        includeContent: { type: 'boolean', description: 'Include HTML and plain text (may be large)' },
       },
       required: ['id'],
     },
@@ -60,7 +62,7 @@ export const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'get_email_stats',
-    description: 'Get email performance statistics',
+    description: 'Get lifetime sent/read counters from the email record',
     inputSchema: {
       type: 'object',
       properties: {
@@ -95,7 +97,7 @@ export const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'get_email_graph_stats',
-    description: 'Get email graph statistics for a date range (Mautic 7)',
+    description: 'Check email graph statistics availability; date-range counts are not supported by this connector',
     inputSchema: {
       type: 'object',
       properties: {
@@ -125,36 +127,37 @@ export const toolHandlers: Record<string, ToolHandler> = {
   async list_emails(client: MauticApiClient, args: any) {
     const params: any = {};
     if (args?.search) params.search = args.search;
-    if (args?.limit) params.limit = Math.min(args.limit, 200);
+    params.limit = pageLimit(args?.limit, 20);
     if (args?.start) params.start = args.start;
     if (args?.publishedOnly) params.publishedOnly = args.publishedOnly;
 
     const response = await client.v1.get('/emails', { params });
     return {
-      content: [{ type: 'text', text: `Found ${response.data.total} emails:\n${JSON.stringify(response.data.emails, null, 2)}` }],
+      content: [{ type: 'text', text: `Found ${response.data.total} emails:\n${JSON.stringify(Object.fromEntries(Object.entries(response.data.emails ?? {}).map(([id, email]) => [id, emailSummary(email)])))}` }],
     };
   },
 
   async get_email(client: MauticApiClient, args: any) {
-    const { id } = args;
+    const { id, includeContent } = args;
     const response = await client.v1.get(`/emails/${id}`);
     return {
-      content: [{ type: 'text', text: `Email details:\n${JSON.stringify(response.data.email, null, 2)}` }],
+      content: [{ type: 'text', text: `Email details:\n${JSON.stringify(includeContent ? { ...emailSummary(response.data.email), customHtml: response.data.email?.customHtml, plainText: response.data.email?.plainText } : emailSummary(response.data.email))}` }],
     };
   },
 
   async create_email_template(client: MauticApiClient, args: any) {
     const response = await client.v1.post('/emails/new', args);
     return {
-      content: [{ type: 'text', text: `Email template created successfully:\n${JSON.stringify(response.data.email, null, 2)}` }],
+      content: [{ type: 'text', text: `Email template created successfully:\n${JSON.stringify(writeSummary(response.data.email, Object.keys(args)))}` }],
     };
   },
 
   async get_email_stats(client: MauticApiClient, args: any) {
     const { emailId } = args;
-    const response = await client.v1.get(`/emails/${emailId}/stats`);
+    const response = await client.v1.get(`/emails/${emailId}`);
+    const { sentCount, readCount, variantSentCount, variantReadCount } = response.data.email;
     return {
-      content: [{ type: 'text', text: `Email statistics:\n${JSON.stringify(response.data.stats, null, 2)}` }],
+      content: [{ type: 'text', text: `Email statistics:\n${JSON.stringify({ emailId, sentCount, readCount, variantSentCount, variantReadCount, scope: 'lifetime' })}` }],
     };
   },
 
@@ -176,13 +179,6 @@ export const toolHandlers: Record<string, ToolHandler> = {
   },
 
   async get_email_graph_stats(client: MauticApiClient, args: any) {
-    const { emailId, isVariant, dateFrom, dateTo } = args;
-    const variant = isVariant ? 1 : 0;
-    const response = await client.v1.get(`/emails/${emailId}`, {
-      params: { dateFrom, dateTo },
-    });
-    return {
-      content: [{ type: 'text', text: `Email ${emailId} stats (${dateFrom} to ${dateTo}):\n${JSON.stringify(response.data, null, 2)}` }],
-    };
+    return { isError: true, content: [{ type: 'text', text: 'Date-range email graph statistics are not supported by the verified API. Use get_email_stats for lifetime counters.' }] };
   },
 };
