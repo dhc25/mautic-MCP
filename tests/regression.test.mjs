@@ -89,3 +89,17 @@ test('tool annotations and response cap', async () => {
   assert.equal(r.isError, true);
   assert.match(r.content[0].text, /output limit/);
 });
+
+test('company mutation returns identifiers and not full records', async () => {
+  const r = await dispatchTool('create_company', client({
+    post: async () => ({ data: { company: { id: 17, name: 'Example', address: 'private address', nested: { field: 'private' } } } }),
+  }), { companyname: 'Example' });
+  assert.deepEqual(resultData(r), { id: 17, requestCompleted: true });
+});
+test('email mutation retains reported failures and counts without echoing contacts', async () => {
+  const r = await dispatchTool('send_email_to_segment', client({
+    post: async () => ({ data: { success: false, sent: 4, failed: 1, errors: [{ message: 'Delivery failed' }], contacts: [{ email: 'private@example.invalid' }] } }),
+  }), { emailId: 24 });
+  assert.deepEqual(resultData(r), { success: false, sent: 4, failed: 1, errors: ['Delivery failed'], requestCompleted: true });
+  assert.doesNotMatch(r.content[0].text, /private@example/);
+});
