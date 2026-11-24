@@ -1,3 +1,4 @@
+import { mutationSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -150,7 +151,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   async create_company(client: MauticApiClient, args: any) {
     const response = await client.v1.post('/companies/new', args);
     return {
-      content: [{ type: 'text', text: `Company created successfully:\n${JSON.stringify(response.data.company, null, 2)}` }],
+      content: [{ type: 'text', text: `Company created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -169,7 +170,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/notes/new', payload);
     return {
-      content: [{ type: 'text', text: `Note created successfully:\n${JSON.stringify(response.data.note, null, 2)}` }],
+      content: [{ type: 'text', text: `Note created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -198,7 +199,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   async create_tag(client: MauticApiClient, args: any) {
     const response = await client.v1.post('/tags/new', { tag: args.tag });
     return {
-      content: [{ type: 'text', text: `Tag created successfully:\n${JSON.stringify(response.data.tag, null, 2)}` }],
+      content: [{ type: 'text', text: `Tag created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -206,7 +207,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { contactId, tags } = args;
     const response = await client.v1.post(`/contacts/${contactId}/contact/add`, { tags });
     return {
-      content: [{ type: 'text', text: `Tags added to contact ${contactId} successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Tags added to contact ${contactId} (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -224,7 +225,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   async create_category(client: MauticApiClient, args: any) {
     const response = await client.v1.post('/categories/new', args);
     return {
-      content: [{ type: 'text', text: `Category created successfully:\n${JSON.stringify(response.data.category, null, 2)}` }],
+      content: [{ type: 'text', text: `Category created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 };
