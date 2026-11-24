@@ -1,3 +1,4 @@
+import { mutationSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -217,7 +218,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   async create_campaign(client: MauticApiClient, args: any) {
     const response = await client.v1.post('/campaigns/new', args);
     return {
-      content: [{ type: 'text', text: `Campaign created successfully:\n${JSON.stringify(response.data.campaign, null, 2)}` }],
+      content: [{ type: 'text', text: `Campaign created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -244,7 +245,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/campaigns/new', payload);
     return {
-      content: [{ type: 'text', text: `Campaign with automation created successfully:\n${JSON.stringify(response.data.campaign, null, 2)}` }],
+      content: [{ type: 'text', text: `Campaign with automation created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -255,7 +256,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post(`/campaigns/${campaignId}/trigger`, payload);
     return {
-      content: [{ type: 'text', text: `Campaign ${campaignId} executed successfully:\n${JSON.stringify(response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Campaign ${campaignId} executed (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -276,7 +277,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { campaignId } = args;
     const response = await client.v1.post(`/campaigns/clone/${campaignId}`);
     return {
-      content: [{ type: 'text', text: `Campaign ${campaignId} cloned successfully:\n${JSON.stringify(response.data.campaign || response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Campaign ${campaignId} cloned (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -292,7 +293,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const { campaignData } = args;
     const response = await client.v1.post('/campaigns/import', campaignData);
     return {
-      content: [{ type: 'text', text: `Campaign imported successfully:\n${JSON.stringify(response.data.campaign || response.data, null, 2)}` }],
+      content: [{ type: 'text', text: `Campaign imported (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
