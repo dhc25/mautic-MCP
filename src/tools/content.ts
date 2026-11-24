@@ -1,3 +1,4 @@
+import { mutationSummary } from './safety.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -137,7 +138,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/assets/new', payload);
     return {
-      content: [{ type: 'text', text: `Asset created successfully:\n${JSON.stringify(response.data.asset, null, 2)}` }],
+      content: [{ type: 'text', text: `Asset created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -167,7 +168,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/pages/new', payload);
     return {
-      content: [{ type: 'text', text: `Landing page created successfully:\n${JSON.stringify(response.data.page, null, 2)}` }],
+      content: [{ type: 'text', text: `Landing page created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 
@@ -191,7 +192,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
     const response = await client.v1.post('/smses/new', payload);
     return {
-      content: [{ type: 'text', text: `[WARNING] SMS API is deprecated in Mautic 7. This endpoint may not work.\nSMS template created successfully:\n${JSON.stringify(response.data.sms, null, 2)}` }],
+      content: [{ type: 'text', text: `[WARNING] SMS API is deprecated in Mautic 7. This endpoint may not work.\nSMS template created (API request completed):\n${JSON.stringify(mutationSummary(response.data))}` }],
     };
   },
 };
