@@ -81,9 +81,9 @@ export async function validateAudience(client: MauticApiClient, email: any, chan
   if (type === 'list' && !lists.length) invalid('Segment email requires recipient segments');
   if (type === 'template' && lists.length) invalid('Template email cannot have recipient segments');
   if (lists.some((id: number) => excluded.includes(id))) invalid('A segment cannot be both included and excluded');
-  await validateSegments(client, lists);
-  await validateSegments(client, excluded);
-  return { lists, excluded };
+  const includedSegments = await validateSegments(client, lists);
+  const excludedSegments = await validateSegments(client, excluded);
+  return { lists, excluded, includedSegments, excludedSegments, exclusionsKnown: changes.excludedLists !== undefined || email.excludedLists !== undefined };
 }
 export function assertNoDncOverride(email: any) {
   if (email.sendToDnc !== false && email.sendToDnc !== 0) invalid('Cannot verify that Do Not Contact override is disabled; disable it in Mautic first');
@@ -94,14 +94,16 @@ export function assertUnsubscribe(email: any) {
   if (!/\{unsubscribe_(?:url|text)\}/i.test(body)) invalid('Segment email must include a Mautic unsubscribe token ({unsubscribe_url} or {unsubscribe_text}) before sending or scheduling');
 }
 export function assertExplicit(value: unknown) { if (value !== true) invalid('Explicit confirmation is required'); }
-export function clonePayload(source: any, name: string) {
+export function clonePayload(source: any, name: string, excludedLists?: unknown) {
   // API has no dedicated clone route. Copy content/settings, never counters, dates, publication or experiment relationships.
   const fields: any = {};
   for (const key of ['subject','language','fromAddress','fromName','replyToAddress','customHtml','plainText','template','preheaderText','emailType','utmTags'])
     if (source[key] !== null && source[key] !== undefined) fields[key] = source[key];
   fields.name = name;
   fields.lists = recordIds(source.lists);
-  fields.excludedLists = recordIds(source.excludedLists);
+  if (excludedLists !== undefined) fields.excludedLists = ids(excludedLists);
+  else if (source.excludedLists !== undefined) fields.excludedLists = recordIds(source.excludedLists);
+  else if (source.emailType === 'list') invalid('Source API does not expose exclusions. Review the original in Mautic and explicitly supply excludedLists (including [] if none).');
   fields.assetAttachments = recordIds(source.assetAttachments);
   if (source.category?.id) fields.category = source.category.id;
   const result = payload(fields, true);
