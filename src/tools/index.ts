@@ -28,7 +28,7 @@ const modules = [
 // Explicit allowlist: new tools default to potentially mutating.
 const readOnly = new Set([
   'get_contact', 'search_contacts', 'list_segments', 'get_segment_contacts',
-  'list_emails', 'get_email', 'get_email_stats', 'get_email_graph_stats',
+  'list_emails', 'get_email', 'get_email_stats', 'get_email_graph_stats', 'preview_email_audience',
   'list_campaigns', 'get_campaign', 'get_campaign_contacts', 'export_campaign',
   'get_campaign_event_details', 'get_campaign_graph_stats', 'get_campaign_map_stats',
   'list_forms', 'get_form', 'get_form_submissions', 'list_assets', 'get_asset',
