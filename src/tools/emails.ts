@@ -1,5 +1,5 @@
 import { emailSummary, pageLimit, writeSummary, mutationSummary } from './safety.js';
-import { emailFields, payload, readEmail, validateAudience, validateSegments, assertNoDncOverride, assertUnsubscribe, assertExplicit, clonePayload, parseDate, positiveId, invalid, sendToContact } from './email-management.js';
+import { emailFields, payload, readEmail, validateAudience, assertNoDncOverride, assertUnsubscribe, assertExplicit, clonePayload, parseDate, positiveId, invalid, sendToContact } from './email-management.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -57,7 +57,7 @@ export const toolDefinitions: ToolDefinition[] = [
   {
     name: 'clone_email',
     description: 'Create a new unpublished draft copying supported email content and settings, not send history, scheduling or A/B relationships.',
-    inputSchema: { type: 'object', properties: { id: { type: 'integer' }, name: { type: 'string' } }, required: ['id', 'name'] },
+    inputSchema: { type: 'object', properties: { id: { type: 'integer' }, name: { type: 'string' }, excludedLists: { type: 'array', items: { type: 'integer' }, description: 'Required if source API omits exclusions; review original in Mautic' } }, required: ['id', 'name'] },
   },
   {
     name: 'preview_email_audience',
@@ -189,7 +189,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
   async clone_email(client: MauticApiClient, args: any) {
     const source = await readEmail(client, args.id);
-    const data = clonePayload(source, args.name);
+    const data = clonePayload(source, args.name, args.excludedLists);
     await validateAudience(client, data, data);
     const response = await client.v1.post('/emails/new', data);
     return { content: [{ type: 'text', text: 'Email draft copied (content/settings only):\n' + JSON.stringify(writeSummary(response.data.email, Object.keys(data))) }] };
@@ -197,11 +197,11 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
   async preview_email_audience(client: MauticApiClient, args: any) {
     const email = await readEmail(client, args.emailId);
-    const { lists, excluded } = await validateAudience(client, email);
-    const counts = async (listIds: number[]) => {
+    const { includedSegments, excludedSegments, exclusionsKnown } = await validateAudience(client, email);
+    const counts = async (segments: any[]) => {
       const result = [];
-      for (const id of listIds) {
-        const segment = ((await validateSegments(client, [id]))[0]);
+      for (const segment of segments) {
+        const id = segment.id;
         if (typeof segment.alias !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(segment.alias)) invalid('Unsupported segment alias');
         const total = Number((await client.v1.get('/contacts', { params: { search: 'segment:' + segment.alias, limit: 5, minimal: true } })).data.total);
         if (!Number.isSafeInteger(total) || total < 0) invalid('Invalid contact count returned');
@@ -209,13 +209,13 @@ export const toolHandlers: Record<string, ToolHandler> = {
       }
       return result;
     };
-    const included = await counts(lists);
-    const exclusions = await counts(excluded);
+    const included = await counts(includedSegments);
+    const exclusions = await counts(excludedSegments);
     return { content: [{ type: 'text', text: 'Audience preview:\n' + JSON.stringify({
-      emailId: email.id, included, excluded: exclusions,
+      emailId: email.id, included, excluded: exclusionsKnown ? exclusions : null, exclusionsKnown,
       maximumMembership: included.reduce((n, s) => n + s.total, 0),
       exactEligibleRecipients: null,
-      note: 'Raw membership only; overlaps, exclusions, DNC, invalid addresses and prior sends are not subtracted.'
+      note: 'Raw membership only; overlaps, exclusions, DNC, invalid addresses and prior sends are not subtracted. If excluded is null, review exclusions in the Mautic UI.'
     }) }] };
   },
 
