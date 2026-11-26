@@ -74,9 +74,14 @@ export function compactContacts(contacts: any) {
 }
 
 export function emailSummary(email: any) {
-  const { id, name, subject, emailType, isPublished, sentCount, readCount, publishUp, publishDown, lists } = email ?? {};
+  const { id, name, subject, emailType, isPublished, sentCount, readCount, publishUp, publishDown, lists, excludedLists,
+    preheaderText, language, fromAddress, fromName, replyToAddress, template, category, assetAttachments, utmTags, sendToDnc, unsubscribeForm } = email ?? {};
+  const refs = (value: any) => value ? Object.values(value).map((v: any) => typeof v === 'number' ? { id: v } : { id: v.id, name: v.name }) : undefined;
   return { id, name, subject, emailType, isPublished, sentCount, readCount, publishUp, publishDown,
-    lists: lists ? Object.values(lists).map((list: any) => ({ id: list.id, name: list.name })) : undefined };
+    preheaderText, language, fromAddress, fromName, replyToAddress, template, utmTags, sendToDnc,
+    category: category ? { id: category.id, name: category.title ?? category.name } : category,
+    lists: refs(lists), excludedLists: refs(excludedLists), assetAttachments: refs(assetAttachments),
+    unsubscribeForm: unsubscribeForm ? { id: unsubscribeForm.id, name: unsubscribeForm.name } : unsubscribeForm };
 }
 
 export function writeSummary(record: any, changedFields?: string[]) {
