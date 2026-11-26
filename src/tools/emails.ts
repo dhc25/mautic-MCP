@@ -1,5 +1,5 @@
 import { emailSummary, pageLimit, writeSummary, mutationSummary } from './safety.js';
-import { emailFields, payload, readEmail, validateAudience, validateSegments, assertNoDncOverride, assertUnsubscribe, assertExplicit, clonePayload, parseDate, positiveId, ids, invalid, sendToContact } from './email-management.js';
+import { emailFields, payload, readEmail, validateAudience, validateSegments, assertNoDncOverride, assertUnsubscribe, assertExplicit, clonePayload, parseDate, positiveId, invalid, sendToContact } from './email-management.js';
 import type { MauticApiClient } from '../api/client.js';
 import type { ToolDefinition, ToolHandler } from '../types/index.js';
 
@@ -7,13 +7,13 @@ export const toolDefinitions: ToolDefinition[] = [
   // Existing email tools
   {
     name: 'send_email',
-    description: 'Send a real tracked email to explicitly specified existing contacts (max 5); requires explicit confirmation and matching email addresses',
+    description: 'Send a real tracked email to explicitly specified one existing contact; requires explicit confirmation and matching email addresses',
     inputSchema: {
       type: 'object',
       properties: {
         emailId: { type: 'number', description: 'Email template ID' },
-        contactIds: { type: 'array', items: { type: 'number' }, description: 'One existing contact ID' },
-        contactEmails: { type: 'array', items: { type: 'string' }, description: 'One matching email address' },
+        contactIds: { type: 'array', items: { type: 'number' }, minItems: 1, maxItems: 1, description: 'One existing contact ID' },
+        contactEmails: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 1, description: 'One matching email address' },
         confirmSend: { type: 'boolean', description: 'Explicit approval to send' },
       },
       required: ['emailId','contactIds','contactEmails','confirmSend'],
@@ -73,6 +73,11 @@ export const toolDefinitions: ToolDefinition[] = [
     name: 'schedule_email',
     description: 'Activate an unpublished segment email for a future date/time with explicit timezone offset. The broadcast cron can send it automatically. Requires explicit approval.',
     inputSchema: { type: 'object', properties: { emailId: { type: 'integer' }, publishUp: { type: 'string' }, publishDown: { type: 'string' }, confirmPublish: { type: 'boolean' } }, required: ['emailId','publishUp','confirmPublish'] },
+  },
+  {
+    name: 'publish_email',
+    description: 'Explicitly publish an unpublished email. For segment emails the scheduled broadcast cron may send immediately. Use schedule_email for future sends.',
+    inputSchema: { type: 'object', properties: { emailId: { type: 'integer' }, confirmPublish: { type: 'boolean' } }, required: ['emailId','confirmPublish'] },
   },
   {
     name: 'get_email_stats',
@@ -236,6 +241,20 @@ export const toolHandlers: Record<string, ToolHandler> = {
     const data = { publishUp, publishDown, isPublished: true, sendToDnc: false };
     const response = await client.v1.patch('/emails/' + email.id + '/edit', data);
     return { content: [{ type: 'text', text: 'Scheduled email:\n' + JSON.stringify({ ...writeSummary(response.data.email, Object.keys(data)), publishUp, publishDown }) }] };
+  },
+
+  async publish_email(client: MauticApiClient, args: any) {
+    assertExplicit(args.confirmPublish);
+    const email = await readEmail(client, args.emailId);
+    if (email.isPublished !== false) invalid('Email must be unpublished');
+    assertNoDncOverride(email);
+    assertUnsubscribe(email);
+    await validateAudience(client, email);
+    if (email.publishUp && Date.parse(email.publishUp) > Date.now()) invalid('Use schedule_email for future publication');
+    if (email.publishDown && Date.parse(email.publishDown) <= Date.now()) invalid('Publication end is in the past');
+    const data = { isPublished: true, sendToDnc: false };
+    const response = await client.v1.patch('/emails/' + email.id + '/edit', data);
+    return { content: [{ type: 'text', text: 'Email published (segment broadcasts may send automatically):\n' + JSON.stringify(writeSummary(response.data.email, Object.keys(data))) }] };
   },
 
   async get_email_stats(client: MauticApiClient, args: any) {
