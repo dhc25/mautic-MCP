@@ -197,3 +197,15 @@ test('publish email requires explicit approval and rejects unsafe content', asyn
     return {data:{email:{id:24}}};
   }}),{emailId:24,confirmPublish:true});
 });
+
+test('missing exclusions are unknown, and a clone must explicitly supply them', async () => {
+  const source = {...draft}; delete source.excludedLists;
+  const r = await dispatchTool('preview_email_audience', fake(source), {emailId:24});
+  assert.equal(resultData(r).excluded,null);
+  assert.equal(resultData(r).exclusionsKnown,false);
+  await assert.rejects(dispatchTool('clone_email',fake(source),{id:24,name:'Copy'}));
+  await dispatchTool('clone_email',fake(source,{post:async (url,data) => {
+    assert.deepEqual(data.excludedLists,[]); assert.equal(data.isPublished,false);
+    return {data:{email:{id:99}}};
+  }}),{id:24,name:'Copy',excludedLists:[]});
+});
